@@ -1,0 +1,337 @@
+{% extends "layout.html" %} {% set active='user_list' %} {% block title %} 用户管理 {% endblock %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="fa fa-home home-icon"></i>
+            <a href="/user/list">
+                首页 </a>
+        </li>
+        <li class="active">用户列表</li>
+    </ul>
+    <!-- .breadcrumb -->
+</div>
+
+<style>
+    input[type="text"] {
+        background: white
+    }
+</style>
+
+{% endblock %} {% block body %}
+<div class="page-content">
+    <div class="row">
+        <div class="col-xs-12">
+            {% raw %}
+            <div class="box" id="app" v-cloak>
+                <div class="box-header">
+                    <div class="col-xs-12 col-sm-8" style="margin-bottom: 10px;">
+                        <div>
+                            <el-input placeholder="用户名或者邮箱" v-model="kw">
+                                <el-button slot="append" icon="search" @click="search" v-loading.fullscreen.lock="fullscreenLoading"></el-button>
+                            </el-input>
+
+                        </div>
+                    </div>
+                    <div class="col-xs-12 col-sm-2" style="margin-bottom: 10px;">
+                        <el-button slot="append" icon="plus" @click="showAddDialog()" type="primary">新增</el-button>
+                    </div>
+                </div>
+                <input hidden value="2" id="activeMenu" />
+                <!-- /.box-header -->
+
+                <div class="box-body   clearfix">
+
+                    <el-table :data="users" border style="width: 100%">
+                        <el-table-column prop="realname" label="姓名" width="120">
+                        </el-table-column>
+                        <el-table-column prop="email" label="邮箱">
+                        </el-table-column>
+                        <el-table-column prop="role" label="角色" width="120">
+                            <template scope="scope">
+                                <el-tag v-if="scope.row.role==2" :type="'primary'">管理员</el-tag>
+                                <el-tag v-if="scope.row.role==1" :type="'gray'">开发者</el-tag>
+                            </template>
+                        </el-table-column>
+
+                        <el-table-column prop="status" label="状态" width="120">
+                            <template scope="scope">
+                                <el-tag v-if="scope.row.status==2" :type="'danger'">冻结</el-tag>
+                                <el-tag v-if="scope.row.status!=2" :type="'success'">正常</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="操作">
+                            <template scope="scope">
+                                <el-button size="small" @click="selectedUser = scope.row;dialogVisible = true" v-if="scope.row.status==1" type="warning">冻结</el-button>
+                                <el-button size="small" @click="unFreeze(scope.row)" v-if="scope.row.status==2" type="primary">解冻</el-button>
+                                <el-button  v-if="scope.row.status!=2" size="small" type="primary" @click="showRelationDialog(scope.row)">设置关联项目</el-button>
+                                 <!-- <el-button  v-if="scope.row.status!=2 && scope.row.projects.length>0"  size="small" @click="showProjectsDialog(scope.row.projects)">查看关联项目 </el-button> -->
+                            </template>
+
+                        </el-table-column>
+                    </el-table>
+
+                    <div class="block">
+                        <el-pagination style="margin-top:30px;" @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page.sync="currentPage" :page-size="10" layout="total,prev, pager, next, jumper" :total="total">
+                        </el-pagination>
+                    </div>
+
+                    <el-dialog title="提示" :visible.sync="dialogVisible" size="tiny" :before-close="handleClose">
+                        <span>你确定要冻结这个人吗，一旦冻结 【{{selectedUser.email}}】的账号就无效了，确定吗？</span>
+                        <span slot="footer" class="dialog-footer">
+                            <el-button @click="dialogVisible = false">取 消</el-button>
+                            <el-button @click="freezeGitlab()" type="warning">顺便冻结gitlab账号</el-button>
+                            <el-button type="primary" @click="onlyFreezeEve()">确 定</el-button>
+                        </span>
+                    </el-dialog>
+
+
+
+                    <el-dialog title="设置关联项目" :visible.sync="rDialogVisible">
+                        <!-- <el-card>
+                            <el-checkbox-group v-model="selected">
+                                <el-checkbox style="margin:2px;" v-for="project in projects" :label="project.name" :key="project.id">{{project.name}}</el-checkbox>
+                            </el-checkbox-group>
+
+
+                        </el-card>-->
+                        <el-select v-model="selected" multiple placeholder="请选择" style="width:100%;" filterable>
+                            <el-option v-for="item in projects" :key="item.id" :label="item.name" :value="item.name" style="width:100%;">
+                            </el-option>
+                        </el-select>
+                        <span slot="footer" class="dialog-footer">
+                            <el-button @click="rDialogVisible = false">取 消</el-button>
+                            <el-button type="primary" @click="updateRelationProject()">确 定</el-button>
+                        </span>
+                    </el-dialog>
+
+
+                    <el-dialog title="新增用户" :visible.sync="addUserDialogVisible" size="tiny">
+                        <el-form :model="freshUser" label-width="120px" ref="form">
+                            <el-form-item label="用户邮箱">
+                                <el-input v-model="freshUser.email"> </el-input>
+                            </el-form-item>
+
+                            <el-form-item label="姓名">
+                                <el-input v-model="freshUser.realname"> </el-input>
+                            </el-form-item>
+
+                            <el-form-item label="用户名">
+                                <el-input v-model="freshUser.username"> </el-input>
+                            </el-form-item>
+
+                            <el-form-item label="角色">
+                                <el-select v-model="freshUser.role">
+                                    <el-option value="1" label="开发者"></el-option>
+                                    <el-option value="2" label="管理员"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="开通gitlab">
+                                <el-switch on-text="" off-text="" v-model="freshUser.gitlab"></el-switch>
+                            </el-form-item>
+                            <el-form-item label="关联项目">
+                                <el-select v-model="freshUser.projects" multiple placeholder="请选择" style="width:100%;" filterable>
+                                    <el-option v-for="item in projects" :key="item.id" :label="item.name" :value="item.id" style="width:100%;">
+                                    </el-option>
+                                </el-select>
+                            </el-form-item>
+
+                        </el-form>
+                        <span slot="footer" class="dialog-footer">
+                            <el-button @click="addUserDialogVisible = false">取 消</el-button>
+                            <el-button type="primary" @click="addUser()">确 定</el-button>
+                        </span>
+                    </el-dialog>
+
+                    <el-dialog title="查看关联项目" :visible.sync="showProjectsDialogVisible">
+                        <el-tag v-for="project in showProjects" :key="project.id" style="margin:5px;" type="primary">{{project.name}}</el-tag>
+                    </el-dialog>
+
+                </div>
+            </div>
+            <!-- /.box-body -->
+        </div>
+
+
+        {% endraw %}
+
+
+        <script>
+            var app = new Vue({
+                el: '#app',
+                data: {
+                    users: [],
+                    kw: "",
+                    projects: [],
+                    selected: [],
+                    selectProjects: [],
+                    dialogVisible: false,
+                    rDialogVisible: false,
+                    selectedUser: {},
+                    select: '',
+                    fullscreenLoading: false,
+                    addUserDialogVisible: false,
+                    form: {
+
+                    },
+                    freshUser: {
+                        email: "",
+                        role: '1',
+                        gitlab: true,
+                        projects: []
+                    },
+                    currentPage: 1,
+                    total: 0,
+                    showProjectsDialogVisible: false,
+                    showProjects: [],
+                    filterMethod(query, item) {
+                        return item.label.indexOf(query) > -1;
+                    },
+                    leftChecked: []
+                },
+                methods: {
+                    unFreeze: function(user) {
+                        var $this = this;
+                        $.ajax({
+                            url: '/api/users/' + user.id + '/status/1',
+                            type: 'PUT',
+                            success: function(response) {
+                                $this.$message('解冻成功');
+                                user.status = 1
+                            }
+                        });
+                    },
+                    search: function() {
+                        app.currentPage = 1;
+                        var $this = this;
+                        $this.fullscreenLoading = true;
+                        $.get('/api/users', {
+                            kw: this.kw
+                        }).success(function(res) {
+                            app.users = res.data;
+                            app.total = res.total_count;
+                            $this.fullscreenLoading = false;
+                        });
+                    },
+                    updateRelationProject: function() {
+                        var $this = this;
+                        var selectedUser = this.selectedUser;
+                        var currentUserId = this.selectedUser.id;
+
+                        $.ajax({
+                            url: '/api/user/' + currentUserId + '/projects',
+                            type: 'POST',
+                            data: JSON.stringify($this.selected),
+                            contentType: "application/json;charset=utf-8",
+                            success: function(response) {
+                                $this.$message('绑定成功');
+                                selectedUser.projects = response.data.projects;
+                                $this.rDialogVisible = false;
+                            }
+                        });
+                    },
+                    onlyFreezeEve: function() {
+                        var $this = this;
+                        $.ajax({
+                            url: '/api/users/' + $this.selectedUser.id + '/status/2',
+                            type: 'PUT',
+                            success: function(response) {
+                                $this.$message('冻结成功');
+                                $this.selectedUser.status = 2;
+                                $this.dialogVisible = false;
+                            }
+                        });
+                    },
+                    handleClose(done) {
+                        done();
+                    },
+                    showRelationDialog: function(user) {
+                        var $this = this;
+                        this.rDialogVisible = true;
+                        this.selectedUser = user;
+                        this.selected = user.projects.map(function(v) {
+                            return v.name
+                        });
+                    },
+                    showAddDialog: function() {
+                        this.addUserDialogVisible = true;
+
+                    },
+                    addUser: function() {
+                        var $this = this;
+                        $.ajax({
+                            url: '/api/users',
+                            type: 'POST',
+                            data: JSON.stringify($this.freshUser),
+                            contentType: "application/json;charset=utf-8",
+                            success: function(response) {
+                                if (response.code == 200) {
+                                    $this.$message('创建成功');
+                                    $this.users.push(response.data)
+                                    $this.addUserDialogVisible = false;
+                                    freshUser = {
+                                        email: "",
+                                        role: '1',
+                                        gitlab: true,
+                                        projects: []
+                                    };
+                                } else {
+                                    $this.$message.error('创建失败，原因：' + response.data);
+                                }
+                            }
+                        });
+                    },
+                    freezeGitlab: function() {
+                        var $this = this;
+                        var selectUser = $this.selectedUser;
+                        $.ajax({
+                            url: '/api/users/' + $this.selectedUser.id + '/status/2?gitlab=1',
+                            type: 'PUT',
+                            success: function(response) {
+                                $this.$message('冻结成功');
+                                $this.selectedUser.status = 2;
+                                $this.dialogVisible = false;
+                            }
+                        });
+
+                    },
+                    handleSizeChange: function() {
+                        console.log(" handleSizeChange")
+                    },
+                    handleCurrentChange: function() {
+                        app.fullscreenLoading = true;
+                        var currentPage = app.currentPage;
+                        $.get('/api/users', {
+                            "page": currentPage
+                        }).success(function(res) {
+                            app.users = res.data;
+                            app.total = res.total_count;
+                            app.fullscreenLoading = false;
+                        });
+                    },
+                    showProjectsDialog: function(projects) {
+                        this.showProjects = projects;
+                        this.showProjectsDialogVisible = true;
+
+                    }
+                }
+            });
+
+
+
+
+            $.get('/api/users').success(function(res) {
+                app.users = res.data;
+                app.total = res.total_count;
+            });
+            $.get('/api/projects').success(function(res) {
+                app.projects = res.data;
+
+            });
+        </script>
+    </div>
+    <!-- /.col -->
+</div>
+<!-- /.row -->
+</div>
+
+{% endblock %}

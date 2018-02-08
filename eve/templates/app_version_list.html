@@ -1,0 +1,317 @@
+{% extends "layout.html" %} {% block title %} APP发布管理 {% endblock %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="fa fa-home home-icon"></i>
+            <a href="/">
+                    首页 </a>
+        </li>
+        <li class="active">APP发布管理</li>
+    </ul>
+    <style>
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+    <!-- .breadcrumb -->
+</div>
+
+{% endblock %} {% block body %} {% raw %}
+<input hidden value="7" id="activeMenu" />
+
+<div class="page-content" id="app" v-cloak>
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <div class="col-xs-12 col-sm-8" style="padding-left: 0;margin-bottom: 10px;margin-top:10px;">
+                        <!-- <div>
+                            <el-input placeholder="任务名称" v-model="kw">
+                                <el-button slot="append" icon="search" @click="search" v-loading.fullscreen.lock="fullscreenLoading"></el-button>
+                            </el-input>
+                        </div> -->
+
+                        <el-form :inline="true" class="demo-form-inline">
+                            <el-form-item label="客户端类型">
+                                <el-select v-model="clientType" placeholder="选择客户端" size="small" @change="search()">
+                                    <el-option key="android" label="android" value="android"> </el-option>
+                                    <el-option key="ios" label="ios" value="ios"> </el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="createVersion()" icon="plus" size="small">
+                                    创建发布版本
+                                </el-button>
+                            </el-form-item>
+
+                        </el-form>
+
+                    </div>
+
+                </div>
+                <!-- /.box-header -->
+                <div class="box-body table-responsive no-padding clearfix">
+
+                    <el-table :data="appVersions" border size="small">
+                        <el-table-column prop="client_type" label="客户端类型">
+                        </el-table-column>
+                        <el-table-column prop="app_version" label="版本号">
+                            <template scope="scope">
+                                <a :href="scope.row.download_url">{{scope.row.app_version}}</a>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="file_size" label="文件大小">
+                            <template scope="scope">
+                                {{scope.row.file_size * 1.0 /1000}}M
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="更新模式">
+                            <template scope="scope">
+                                <span v-if="scope.row.update_mode==1">普通更新</span>
+                                <span v-if="scope.row.update_mode==2">强制更新</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="last_modified_date" label="最后更新时间">
+                        </el-table-column>
+                        <el-table-column label="是否有效">
+                            <template scope="scope">
+                                <span v-if="scope.row.flag==1">有效</span>
+                                <span v-if="scope.row.flag==0">无效</span>
+                            </template>
+                        </el-table-column>
+
+                        <el-table-column label="发布状态">
+                            <template scope="scope">
+                                <span v-if="scope.row.state==1">未发布</span>
+                                <span v-if="scope.row.state==2">已发布</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="操作">
+                            <template scope="scope">
+                                <el-button type="success" size="small" icon="upload" v-if="scope.row.flag==1 && scope.row.state==1" @click="deployVersion(scope.row)">发布</el-button>
+                                <el-button type="danger" size="small" icon="delete" v-if="scope.row.flag==1 && scope.row.state==1" @click="deleteInfo(scope.row)">删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <div class="block">
+                        <el-pagination style="margin-top:30px;" @current-change="handleCurrentChange" :current-page.sync="currentPage" :page-size="10" layout="total,prev, pager, next, jumper" :total="total">
+                        </el-pagination>
+                    </div>
+                </div>
+                <!-- /.box-body -->
+
+                <el-dialog title="创建发布版本" :visible.sync="versionAddDialogVisible">
+                    <el-form :model="appVersion">
+                        <el-form-item label="应用名" :label-width="formLabelWidth">
+                            <el-input v-model="appVersion.app_name" auto-complete="off" disabled style="width:70%"></el-input>
+                        </el-form-item>
+                        <el-form-item label="版本号" :label-width="formLabelWidth">
+                            <el-input v-model="appVersion.app_version" auto-complete="off" style="width:70%"></el-input>
+                        </el-form-item>
+                        <el-form-item label="客户端类型" :label-width="formLabelWidth">
+                            <el-select v-model="appVersion.client_type" placeholder="选择客户端" @change="clientChange()" style="width:70%">
+                                <el-option key="android" label="android" value="android"> </el-option>
+                                <el-option key="ios" label="ios" value="ios"> </el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="发布文件" :label-width="formLabelWidth" v-if="appVersion.client_type=='android'">
+                            <el-upload action="/api/apk" :on-remove="handleRemove" :on-success="handleSuccess" :file-list="fileList">
+                                <el-button size="small" type="primary">点击上传</el-button>
+                                <div slot="tip" class="el-upload__tip">只能上传apk文件</div>
+                            </el-upload>
+                        </el-form-item>
+
+                        <el-form-item label="下载地址" :label-width="formLabelWidth">
+                            <el-input v-model="appVersion.download_url" auto-complete="off" disabled style="width:70%"></el-input>
+                        </el-form-item>
+                        <el-form-item label="更新方式" :label-width="formLabelWidth">
+                            <el-radio-group v-model="appVersion.update_mode">
+                                <el-radio-button :label="1">普通更新</el-radio-button>
+                                <el-radio-button :label="2">强制更新</el-radio-button>
+                            </el-radio-group>
+                        </el-form-item>
+
+
+                    </el-form>
+                    <div slot="footer" class="dialog-footer">
+                        <el-button @click="versionAddDialogVisible = false">取 消</el-button>
+                        <el-button type="primary" @click="create()">确 定</el-button>
+                    </div>
+                </el-dialog>
+
+            </div>
+
+
+        </div>
+        <!-- /.col -->
+    </div>
+    <!-- /.row -->
+</div>
+{% endraw %}
+
+<script type="text/javascript ">
+    //状态0：新建提交，1审核通过，2审核拒绝，3上线完成，4上线失败',
+    var app = new Vue({
+        el: '#app',
+        data: {
+            appVersions: [],
+            kw: "",
+            fullscreenLoading: false,
+            clientType: null,
+            versionAddDialogVisible: false,
+            appVersion: {
+                app_name: "保客云集",
+                app_version: "",
+                client_type: "android",
+                download_url: '',
+                update_mode: 1,
+                file_size: 0
+            },
+            fileList: [],
+            formLabelWidth: "120px",
+            currentPage: 1,
+            total: 0
+        },
+        methods: {
+            search: function() {
+
+                this.fullscreenLoading = true;
+                $.ajax({
+                    url: '/api/app-versions',
+                    data: {
+                        client_type: app.clientType,
+                        page: app.currentPage
+                    },
+                    type: 'GET',
+                    success: function(res) {
+                        app.appVersions = res.data;
+                        app.total = res.total_count;
+                        this.fullscreenLoading = false;
+                    }
+                });
+            },
+            handleCurrentChange: function() {
+                app.search();
+            },
+            createVersion: function() {
+                app.appVersion = {
+                    app_name: "保客云集",
+                    app_version: "",
+                    client_type: "android",
+                    download_url: '',
+                    update_mode: 1,
+                    file_size: 0
+                };
+                app.fileList = [];
+                app.versionAddDialogVisible = true;
+            },
+            create: function() {
+                // app.versionAddDialogVisible = false;
+                var $this = this;
+                $.ajax({
+                    url: '/api/app-versions',
+                    type: 'POST',
+                    data: JSON.stringify(app.appVersion),
+                    contentType: "application/json;charset=utf-8",
+                    success: function(res) {
+                        app.versionAddDialogVisible = false;
+                        $this.$message({
+                            type: 'success',
+                            message: '创建成功'
+                        });
+                        app.search();
+                    }
+                });
+            },
+            handleSuccess(response, file, fileList) {
+                app.appVersion.download_url = response.download_url;
+                app.appVersion.file_size = response.file_size;
+            },
+            handleRemove(file) {
+                const $this = this;
+
+                $.ajax({
+                    url: '/api/apk/' + file.name,
+                    type: 'DELETE',
+                    success: function(res) {
+                        if (res.code == 200) {
+                            app.appVersion.download_url = '';
+                            $this.$message({
+                                type: 'success',
+                                message: res.data
+                            });
+                        }
+
+                    }
+                });
+            },
+            clientChange: function() {
+                if (app.appVersion.client_type == 'ios') {
+                    app.appVersion.download_url = 'http://itunes.apple.com/cn/app/id1018838753';
+                } else {
+                    app.appVersion.download_url = '';
+                }
+            },
+            deleteInfo: function(obj) {
+                const $this = this;
+                this.$confirm('你确定要删除这个记录吗', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    $.ajax({
+                        'url': "/api/app-versions/" + obj.id,
+                        'method': "DELETE",
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '删除成功!'
+                            });
+                            $this.search();
+                        }
+
+                        if (response.code == 500) {
+                            $this.$message.error({
+                                message: response.data
+                            });
+                        }
+
+                    });
+                }).catch(() => {
+                    $this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    });
+                });
+            },
+            deployVersion: function(obj) {
+                var $this = this;
+                $.ajax({
+                    url: '/api/app-versions/state',
+                    type: 'PUT',
+                    data: JSON.stringify({
+                        id: obj.id,
+                        state: 2
+                    }),
+                    contentType: "application/json;charset=utf-8",
+                    success: function(res) {
+                        if (res.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '发布成功'
+                            });
+                        } else {
+                            $this.$message.error(res.data)
+                        }
+                    }
+                });
+            }
+        }
+    });
+
+    app.search();
+</script>
+<!-- /.page-content -->
+{% endblock %}

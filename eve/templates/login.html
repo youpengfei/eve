@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <title>登录平台 - EVE 平台</title>
+    <!-- basic styles -->
+    <link href="//cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <link href="/static/walle/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/walle/font-awesome.min.css">
+
+    <link rel="stylesheet" href="/static/walle/ace.min.css">
+
+
+
+</head>
+
+<body class="login-layout">
+
+
+    <div class="main-container">
+        <div class="main-content">
+            <div class="row">
+                <div class="col-sm-10 col-sm-offset-1">
+                    <div class="login-container">
+                        <div class="center">
+                            <h1>
+                                <i class="icon-leaf green"></i>
+                                <span class="red">EVE</span>
+                                <span class="white">平台</span>
+                            </h1>
+                        </div>
+
+                        <div class="space-6"></div>
+
+                        <div class="position-relative">
+                            <div id="login-box" class="login-box visible widget-box no-border">
+                                <div class="widget-body">
+                                    <div class="widget-main">
+                                        <h4 class="header blue lighter bigger">
+                                            <i class="fa fa-coffee"></i> 登录平台 </h4>
+
+                                        <div class="space-6"></div>
+                                        <form id="login-form" method="post">
+
+                                            <div class="form-group field-loginform-username required">
+                                                <label class="control-label" for="loginform-username">邮箱</label>
+                                                <input type="text" id="loginform-username" class="form-control" name="email">
+                                            </div>
+                                            <div class="form-group field-loginform-password required {% if error_message %}has-error{% endif %} ">
+                                                <label class="control-label" for="loginform-password">密码</label>
+                                                <input type="password" id="loginform-password" class="form-control" name="password">
+                                                <div class="help-block">{{ error_message }}</div>
+                                            </div>
+                                            <div class="form-group field-loginform-rememberme">
+
+                                                <label>
+                                                <input type="checkbox" id="loginform-rememberme" name="remember_me" >
+                                                记住我</label>
+                                            </div>
+                                            <div class="form-group">
+                                                <button type="submit" class="btn btn-primary" name="login-button">提交
+                                            </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <!-- /widget-main -->
+
+                                    <div class="toolbar clearfix">
+
+                                    </div>
+
+                                </div>
+                                <!-- /widget-body -->
+                            </div>
+                            <!-- /login-box -->
+
+                        </div>
+                        <!-- /position-relative -->
+                    </div>
+                </div>
+                <!-- /.col -->
+            </div>
+            <!-- /.row -->
+        </div>
+    </div>
+    <!-- /.main-container -->
+
+    <!-- basic scripts -->
+
+    <script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+    <!-- inline scripts related to this page -->
+
+    <script type="text/javascript">
+        function show_box(id) {
+            jQuery('.widget-box.visible').removeClass('visible');
+            jQuery('#' + id).addClass('visible');
+        }
+        $.ready(function() {
+            $('#loginform-rememberme').on('change', function() {
+                $(this).val(this.checked);
+            });
+            $('#loginform-rememberme').val($('#loginform-rememberme')[0].checked);
+        });
+    </script>
+
+
+</body>
+
+</html>

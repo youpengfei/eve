@@ -1,0 +1,378 @@
+{% extends "layout.html" %} {% block title %} 项目配置列表 {% endblock %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="fa fa-home home-icon"></i>
+            <a href="/conf/">
+                    首页 </a>
+        </li>
+        <li class="active">项目配置</li>
+    </ul>
+    <!-- .breadcrumb -->
+</div>
+
+
+{% endblock %} {% block body %} {% raw %}
+<input hidden value="1" id="activeMenu" />
+
+<div class="page-content" id="app" v-cloak>
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <div class="col-xs-12 col-sm-8" style="padding-left: 0;margin-bottom: 10px;">
+                        <el-input placeholder="输入项目名称" v-model="kw" size="small">
+                            <el-button slot="append" icon="search" @click="search" v-loading.fullscreen.lock="fullscreenLoading"></el-button>
+                        </el-input>
+                    </div>
+                    <div class="col-sm-2">
+                        <el-button type="primary" icon="plus" @click="editProject()" size="small">新增项目配置</el-button>
+                    </div>
+
+                </div>
+                <!-- /.box-header -->
+                <el-table :data="projects" border style="width: 100%" size="small">
+                    <el-table-column label="项目名称" prop="name">
+                    </el-table-column>
+                    <el-table-column label="环境">
+                        <template scope="scope">
+                                <span v-if="scope.row.level==1">测试</span>
+                                <span v-if="scope.row.level==2">预发布</span>
+                                <span v-if="scope.row.level==3">线上</span>
+                            </template>
+                    </el-table-column>
+                    <el-table-column prop="repo_mode" label="上线方式">
+
+                    </el-table-column>
+                    <el-table-column label="开启审核">
+                        <template scope="scope">
+                                 <span v-if="scope.row.audit==1">是</span>
+                                <span v-if="scope.row.audit!=1">否</span>
+                            </template>
+                    </el-table-column>
+                    <el-table-column label="状态">
+                        <template scope="scope">
+                                 <span v-if="scope.row.status==1">有效</span>
+                                <span v-if="scope.row.status!=1">无效</span>
+
+                            </template>
+                    </el-table-column>
+                    <el-table-column fixed="right" label="操作" width="320">
+                        <template scope="scope">
+                            <el-button size="small" type="warning" @click="cloneProject(scope.row.id)">克隆</el-button>
+                            <el-button size="small" type="info" icon="information" @click="showUsers(scope.row)">成员</el-button>
+                            <el-button size="small" type="primary" icon="edit" @click="editProject(scope.row.id)">修改</el-button>
+                            <el-button size="small" type="danger" icon="delete2" @click="deleteProject(scope.row)">删除</el-button>
+
+                            </template>
+                    </el-table-column>
+                </el-table>
+
+                <div class="block">
+                    <el-pagination style="margin-top:30px;" @current-change="handleCurrentChange" :current-page.sync="currentPage" :page-size="10" layout="total,prev, pager, next, jumper" :total="total">
+                    </el-pagination>
+                </div>
+
+                <!-- 模态框（Modal） -->
+                <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                </div>
+
+                <!-- /.box-body -->
+            </div>
+
+
+        </div>
+        <!-- /.col -->
+    </div>
+    <!-- /.row -->
+
+
+    <el-dialog :title="newProject.id!=null?'更新项目配置':'设置项目配置'" :visible.sync="dialogTableVisible">
+        <el-form :model="newProject">
+            <el-tabs>
+                <el-tab-pane label="基本信息">
+                    <el-form-item label="项目名称" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.name" auto-complete="off" style="width:70%;" placeholder="请填写项目名称"></el-input>
+                    </el-form-item>
+                    <el-form-item label="发布环境" :label-width="formLabelWidth">
+                        <el-select v-model="newProject.level" placeholder="请选择发布环境" style="width:70%;">
+                            <el-option label="测试" :value="1"></el-option>
+                            <el-option label="预发布" :value="2"></el-option>
+                            <el-option label="线上" :value="3"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="项目地址" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.repo_url" auto-complete="off" style="width:70%;" placeholder="git@git.baokeyunguanjia.com:rd/bpe/eve.git"></el-input>
+                    </el-form-item>
+                </el-tab-pane>
+                <el-tab-pane label="宿主机">
+                    <el-form-item label="代码检出仓库" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.deploy_from" auto-complete="off" style="width:70%;" placeholder="/data/checkout"></el-input>
+                    </el-form-item>
+                    <el-form-item label="排除文件" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.excludes" auto-complete="off" style="width:70%;" type="textarea" :row="2" placeholder=".git"></el-input>
+                    </el-form-item>
+
+                </el-tab-pane>
+                <el-tab-pane label="目标机器">
+                    <el-form-item label="用户" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.release_user" auto-complete="off" style="width:70%;"></el-input>
+                    </el-form-item>
+                    <el-form-item label="webroot" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.release_to" auto-complete="off" style="width:70%;"></el-input>
+                    </el-form-item>
+                    <el-form-item label="发布版本库" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.release_library" auto-complete="off" style="width:70%;"></el-input>
+                    </el-form-item>
+                    <el-form-item label="版本保留数" :label-width="formLabelWidth">
+                        <el-input-number v-model="newProject.keep_version_num" auto-complete="off" style="width:70%;"></el-input-number>
+                    </el-form-item>
+                    <el-form-item label="机器列表" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.hosts" auto-complete="off" style="width:70%;" type="textarea" :row="2" placeholder="192.168.1.123:22"></el-input>
+                    </el-form-item>
+
+                </el-tab-pane>
+                <el-tab-pane label="高级任务">
+                    <el-form-item label="编译前置" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.pre_deploy" auto-complete="off" style="width:70%;" type="textarea" :rows="newProject.pre_deploy.trim().split('\n').length"></el-input>
+                    </el-form-item>
+                    <el-form-item label="编译命令" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.post_deploy" auto-complete="off" style="width:70%;" type="textarea" :rows="newProject.post_deploy.trim().split('\n').length"></el-input>
+                    </el-form-item>
+                    <el-form-item label="服务启动前" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.pre_release" auto-complete="off" style="width:70%;" type="textarea" :rows="newProject.pre_release.trim().split('\n').length"></el-input>
+                    </el-form-item>
+                    <el-form-item label="服务启动" :label-width="formLabelWidth">
+                        <el-input v-model="newProject.post_release" auto-complete="off" style="width:70%;" type="textarea" :rows="newProject.post_release.trim().split('\n').length"></el-input>
+                    </el-form-item>
+
+                </el-tab-pane>
+                <el-tab-pane label="附加配置">
+                    <el-form-item label="是否开启审核" :label-width="formLabelWidth">
+                        <el-switch v-model="newProject.audit" on-color="#13ce66" off-color="#ff4949" on-value="1">
+                        </el-switch>
+                    </el-form-item>
+
+                    <el-form-item label="是否启用" :label-width="formLabelWidth">
+                        <el-switch v-model="newProject.status" on-color="#13ce66" :on-value="1" :off-value="2" off-color="#ff4949">
+                    </el-form-item>
+                </el-tab-pane>
+
+            </el-tabs>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogTableVisible = false">取 消</el-button>
+            <el-button type="primary" @click="saveChanges()">确 定</el-button>
+        </div>
+    </el-dialog>
+
+</div>
+<script>
+    var app = new Vue({
+        el: "#app",
+        data: {
+            projects: [],
+            kw: '',
+            fullscreenLoading: false,
+            total: 1,
+            currentPage: 1,
+            dialogTableVisible: false,
+            formLabelWidth: "120px",
+            newProject: {
+                name: "",
+                level: 1,
+                repo_url: "",
+                keep_version_num: 5,
+                release_user: "admin",
+                release_to: "/opt/eve",
+                hosts: "192.168.1.123:22",
+                pre_deploy: "",
+                post_deploy: "",
+                pre_release: "",
+                post_release: "",
+                audit: 1,
+                status: 1,
+                excludes: ".git\n.gitignore",
+                deploy_from: "/data/checkout"
+            }
+        },
+        methods: {
+            search: function() {
+                $.get("/api/project-configs", {
+                        page: this.currentPage,
+                        kw: this.kw
+                    })
+                    .success(function(response) {
+                        app.projects = response.data;
+                        app.total = response.count;
+                    });
+            },
+            handleCurrentChange: function() {
+                $.get("/api/project-configs", {
+                        page: this.currentPage
+                    })
+                    .success(function(response) {
+                        app.projects = response.data;
+                        app.total = response.count;
+                    });
+            },
+            editProject: function(id) {
+                var $this = this;
+                if (id) {
+                    $.get("/api/project-configs/" + id).success(function(response) {
+                        $this.dialogTableVisible = true;
+                        $this.newProject = response.data;
+                    });
+                } else {
+                    $this.dialogTableVisible = true;
+                    $this.newProject = {
+                        name: "",
+                        level: 1,
+                        repo_url: "",
+                        keep_version_num: 5,
+                        release_user: "admin",
+                        release_to: "/opt/eve",
+                        hosts: "",
+                        pre_deploy: "",
+                        post_deploy: "",
+                        pre_release: "",
+                        post_release: "",
+                        audit: 1,
+                        status: 1,
+                        excludes: ".git\n.gitignore",
+                        deploy_from: "/data/checkout",
+                        release_library: "/data/release"
+                    };
+                }
+            },
+            saveChanges: function() {
+                var project = this.newProject;
+                var $this = this;
+                //如果id存在就是修改，不过不存在就是新增
+                if (project.id) {
+                    $.ajax({
+                        url: "/api/project-configs",
+                        method: "PUT",
+                        data: JSON.stringify(project),
+                        contentType: "application/json;charset=utf-8",
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '修改成功!'
+
+                            });
+                            $this.dialogTableVisible = false;
+                        } else {
+                            $this.$message.error('修改失败，原因：' + response.data);
+                        }
+
+                    });
+                } else {
+                    $.ajax({
+                        url: "/api/project-configs",
+                        method: "POST",
+                        data: JSON.stringify(project),
+                        contentType: "application/json;charset=utf-8",
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '新建成功!'
+
+                            });
+                            $this.dialogTableVisible = false;
+                        } else {
+                            $this.$message.error('创建失败，原因：' + response.data);
+                        }
+
+                    });
+                }
+
+            },
+            deleteProject: function(project) {
+                var $this = this;
+                this.$confirm('你确定要删除这个项目吗，如果它关联有任务将只能设置为失效了，您确定要删除吗？', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    $.ajax({
+                        'url': "/api/project-configs/" + project.id,
+                        'method': "DELETE",
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '删除成功!'
+                            });
+                            $this.search();
+                        }
+
+                        if (response.code == 500) {
+                            $this.$message.error({
+                                message: response.data
+                            });
+                        }
+
+                    });
+                }).catch(() => {
+                    $this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    });
+                });
+            },
+            cloneProject: function(projectId) {
+                var $this = this;
+                this.$confirm('你确定要克隆这个项目吗？', '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'info'
+                    }).then(() => {
+                        $.ajax({
+                            url: "/api/project-configs/" + projectId + "/duplicate",
+                            method: "POST",
+                        }).success(function(response) {
+                            $this.$message({
+                                type: 'success',
+                                message: '克隆成功!'
+                            });
+
+                        });
+                    })
+                    .catch(() => {
+                        $this.$message({
+                            type: 'info',
+                            message: '操作取消'
+                        });
+                    });
+            },
+            showUsers: function(project) {
+                const h = this.$createElement;
+                const message = [
+                    h('ul', null, '')
+                ]
+                project.users.forEach(function(item) {
+                    message.push(h('li', null, item.email))
+                })
+                this.$msgbox({
+                    title: '项目下成员列表',
+                    message: h('p', null, message),
+                    confirmButtonText: '确定',
+                }).then(action => {});
+            }
+        }
+    });
+
+    jQuery(function($) {
+        $.get("/api/project-configs")
+            .success(function(response) {
+                app.projects = response.data;
+                app.total = response.count;
+
+            });
+    });
+</script>
+
+{% endraw %} {% endblock %}

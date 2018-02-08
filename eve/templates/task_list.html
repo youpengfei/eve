@@ -1,0 +1,501 @@
+{% extends "layout.html" %} {% block title %} 上线单列表 {% endblock %} {% set active='task_list' %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="fa fa-home home-icon"></i>
+            <a href="/">
+                    首页 </a>
+        </li>
+        <li class="active">上线单列表</li>
+    </ul>
+    <!-- .breadcrumb -->
+</div>
+
+{% endblock %} {% block body %} {% raw %}
+<input hidden value="3" id="activeMenu" />
+
+<div class="page-content" id="app" v-cloak>
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <div class="col-xs-12 col-sm-8" style="padding-left: 0;margin-bottom: 10px;margin-top:10px;">
+                        <!-- <div>
+                            <el-input placeholder="任务名称" v-model="kw">
+                                <el-button slot="append" icon="search" @click="search" v-loading.fullscreen.lock="fullscreenLoading"></el-button>
+                            </el-input>
+                        </div> -->
+
+                        <el-form :inline="true" class="demo-form-inline">
+                            <el-form-item label="任务名称">
+                                <el-input v-model="kw" placeholder="任务名称" size="small"></el-input>
+                            </el-form-item>
+                            <el-form-item label="是否显示全部">
+                                <el-select v-model="status" placeholder="选择状态" size="small">
+                                    <el-option v-for="status in allStatus" :key="status.value" :label="status.label" :value="status.value">
+                                    </el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="gray" @click="search()" icon="search" size="small">
+                                    查询
+                                </el-button>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="createDeploy()" icon="plus" size="small">
+                                    创建任务
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+
+                    </div>
+
+                </div>
+                <!-- /.box-header -->
+                <div class="box-body table-responsive no-padding clearfix">
+
+                    <el-table :data="tasks" border style="width: 100%" size="small">
+                        <el-table-column prop="user.realname" label="开发者" width="150">
+                        </el-table-column>
+                        <el-table-column prop="project.name" label="对应项目" width="300">
+                        </el-table-column>
+                        <el-table-column prop="title" label="上线标题">
+                        </el-table-column>
+                        <el-table-column prop="created_at" label="上线时间" width="180">
+                            <template scope="scope">
+                                {{scope.row.created_at | datetime }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="branch" label="对应分支" width="100">
+                        </el-table-column>
+
+                        <el-table-column prop="status" label="当前状态" width="100">
+                            <template scope="scope">
+                                <span v-for='item in allStatus' :key="item.value">
+                                    <span v-if="item.value==scope.row.status"  >
+                                            {{item.label}}
+                                    </span>
+                                </span>
+
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="操作">
+                            <template scope="scope">
+                                <el-button type="success" size="small" icon="upload" v-if="scope.row.status==1 || scope.row.status==4" @click="deploy(scope.row)">上线</el-button>
+                                <el-button type="success" size="small" icon="upload" v-if="scope.row.status==5 " @click="showProccess(scope.row)">查看上线进度</el-button>
+                                <el-button type="primary" size="small" icon="caret-top" v-if="showAuditCondition(scope.row)" @click="applyInit(scope.row)"> 发起审核</el-button>
+                                <el-button type="danger" size="small" icon="delete" v-if="scope.row.status!=3" @click="deleteTask(scope.row)">删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <div class="block">
+                        <el-pagination style="margin-top:30px;" @current-change="handleCurrentChange" :current-page.sync="currentPage" :page-size="10" layout="total,prev, pager, next, jumper" :total="total">
+                        </el-pagination>
+                    </div>
+
+                    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                    </div>
+
+                    <el-dialog title="请选择发布项目" :visible.sync="dialogVisible">
+                        <el-form v-model="task">
+                            <el-form-item label="项目级别" :label-width="formLabelWidth">
+                                <el-select v-model="task.projectLevel" placeholder="项目级别" @change="levelChange" size="small" style="width:70%;">
+                                    <el-option :label="level.label" :value="level.value" v-for="level in projectLevels" :key="level.value"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="项目" :label-width="formLabelWidth">
+                                <el-select v-model="task.project" placeholder="请选择项目" @change="projectChange" size="small" style="width:70%;" filterable>
+                                    <el-option :label="deployProject.name" :value="deployProject" v-for="deployProject in deployProjects" :key="deployProject.id"></el-option>
+                                </el-select>
+                            </el-form-item>
+
+                            <el-form-item label="发布名称" :label-width="formLabelWidth">
+                                <el-input v-model="task.title" auto-complete="off" size="small" style="width:70%;"></el-input>
+                            </el-form-item>
+                            <el-form-item label=" 分支 " :label-width="formLabelWidth ">
+                                <el-select v-model="task.branch " placeholder="请选择项目 " size="small " style="width:70%;" :disabled="task.project==''">
+                                    <el-option :label="item.name " :value="item.name " v-for="item in deployBranchs " :key="item.name"></el-option>
+                                </el-select>
+                            </el-form-item>
+                        </el-form>
+                        <span slot="footer" class="dialog-footer ">
+                            <el-button @click="dialogVisible=false"  size="small ">取 消</el-button>
+                            <el-button type="primary " @click="createTask()"  size="small ">确 定</el-button>
+                        </span>
+                    </el-dialog>
+
+
+                    <el-dialog title="项目部署" :visible.sync="deployDialogVisible" size="large">
+                        <el-steps :active="active" finish-status="success" :center="true">
+                            <el-step title="权限、目录检查"> </el-step>
+                            <el-step title="编译前置任务"></el-step>
+                            <el-step title="代码检出"></el-step>
+                            <el-step title="编译打包"></el-step>
+                            <el-step title="同步至服务器"></el-step>
+                            <el-step title="更新前置"></el-step>
+                            <el-step title="更新版本"></el-step>
+                            <el-step title="清理任务"></el-step>
+                        </el-steps>
+                        <pre>
+                        <code>
+                            {{deployLog}}
+                        </code>
+                        </pre>
+                    </el-dialog>
+
+                    <el-dialog title="发起审核" :visible.sync="applyDialogVisible">
+                        <el-form :model="auditModel">
+                            <el-form-item label="审核人" :label-width="formLabelWidth">
+                                <el-select v-model="auditModel.assign_user_id" placeholder="请选择一个审核人">
+                                    <el-option :label="user.email" :value="user.id" :key="user.id" v-for="user in admins"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="上线理由" :label-width="formLabelWidth">
+                                <el-input v-model="auditModel.deploy_reason" auto-complete="off" type="textarea" :row="2"></el-input>
+                            </el-form-item>
+                        </el-form>
+                        <div slot="footer" class="dialog-footer">
+                            <el-button @click="applyDialogVisible = false">取 消</el-button>
+                            <el-button type="primary" @click="apply()">确 定</el-button>
+                        </div>
+                    </el-dialog>
+
+                </div>
+                <!-- /.box-body -->
+
+
+            </div>
+
+
+        </div>
+        <!-- /.col -->
+    </div>
+    <!-- /.row -->
+</div>
+{% endraw %}
+
+<script type="text/javascript ">
+    var emaptyTask = {
+        project: "",
+        title: "",
+        projectLevel: '',
+        branch: ""
+    };
+    Vue.filter('datetime', function(value) {
+        return moment(value).format('YYYY-MM-DD HH:mm:ss')
+    });
+    //状态0：新建提交，1审核通过，2审核拒绝，3上线完成，4上线失败',
+    var app = new Vue({
+        el: '#app',
+        data: {
+            tasks: [],
+            currentPage: 1,
+            total: 0,
+            kw: "",
+            fullscreenLoading: false,
+            allStatus: [{
+                value: 0,
+                label: "新建提交 "
+            }, {
+                value: 1,
+                label: "审核通过 "
+            }, {
+                value: 2,
+                label: "审核拒绝"
+            }, {
+                value: 3,
+                label: "上线完成 "
+            }, {
+                value: 4,
+                label: "上线失败 ",
+            }, {
+                value: 5,
+                label: "上线中 ",
+            }],
+            status: 1,
+            dialogVisible: false,
+            currentUser: {
+
+            },
+            projectDeploy: {},
+            projectLevels: [{
+                value: '1',
+                label: '测试环境'
+            }, {
+                value: '2',
+                label: '预发布环境'
+            }, {
+                value: '3',
+                label: '线上环境'
+            }],
+            deployProjects: [],
+            deployBranchs: [],
+            formLabelWidth: '120px',
+            task: emaptyTask,
+            active: -1,
+            deployDialogVisible: false,
+            taskStatus: "success",
+            prelog: "",
+            applyDialogVisible: false,
+            admins: [],
+            auditModel: {
+                assign_user_id: null,
+                deploy_reason: ""
+            },
+            selectedTask: {},
+            deployLog: ""
+        },
+        methods: {
+            handleCurrentChange: function() {
+                var $this = this;
+                this.fullscreenLoading = true;
+                $.get("/api/tasks", {
+                    page: this.currentPage,
+                    all_status: 1
+                }).success(function(response) {
+                    app.tasks = response.data;
+                    app.total = response.total_count;
+                    $this.fullscreenLoading = false;
+                });
+            },
+            search: function() {
+                var $this = this;
+                this.fullscreenLoading = true;
+                $.get("/api/tasks", {
+                    page: this.currentPage,
+                    status: this.status,
+                    kw: this.kw
+                }).success(function(response) {
+                    app.tasks = response.data;
+                    app.total = response.total_count;
+                    $this.fullscreenLoading = false;
+                });
+            },
+            createDeploy: function() {
+                this.dialogVisible = true;
+                this.task = {
+                    project: "",
+                    title: "",
+                    projectLevel: '',
+                    branch: ""
+                };
+            },
+            createTask: function() {
+                var $this = this;
+                $this.task.project_id = $this.task.project.id;
+                $.ajax({
+                    url: '/api/tasks',
+                    type: 'POST',
+                    data: JSON.stringify($this.task),
+                    contentType: "application/json;charset=utf-8",
+                    success: function(response) {
+                        if (response.code == 200) {
+                            $this.$message('创建成功');
+                            $this.dialogVisible = false;
+                            $this.search();
+                        } else {
+                            $this.$message.error(response.data)
+                        }
+                    }
+                });
+
+            },
+            levelChange: function(value) {
+                var $this = this;
+                this.task = {
+                    project: {},
+                    title: "",
+                    projectLevel: '',
+                    branch: ""
+                };
+                this.task.projectLevel = value;
+                $this.deployProjects = [];
+                this.currentUser.projects.forEach(function(element) {
+                    if (element.level == value) {
+                        $this.deployProjects.push(element);
+                    }
+                });
+            },
+            projectChange: function(project) {
+                var $this = this;
+                if (project.name) {
+                    this.task.title = project.name + "-" + new Date().getTime();
+                }
+                if (project.id) {
+                    $.get("/api/branchs", {
+                        level: this.task.projectLevel,
+                        project_id: project.id
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.deployBranchs = response.data;
+                        }
+                        if (response.code == 500) {
+                            $this.$message.error(response.data)
+                        }
+                    });
+                }
+
+            },
+            deploy: function(task) {
+                var $this = this;
+                //判断一下当前项目是否在上线过程中，且上线没有失败
+                $.get('/api/tasks/' + task.id, function(response) {
+                    if (response.data.status != 0 && response.data.status != 1 && response.data.status != 4) {
+                        $this.deployDialogVisible = true;
+                    }
+                    if (response.data.status == 1 || response.data.status == 4) {
+                        $this.$confirm('此操作会直接执行发布上线，你确定要上线吗？', '提示', {
+                            confirmButtonText: '确定',
+                            cancelButtonText: '取消',
+                            type: 'warning'
+                        }).then(() => {
+                            var timer = setInterval(function() {
+                                $.get("/api/task-process/" + response.data.id)
+                                    .success(function(response) {
+                                        $this.active = response.data.length;
+                                        $this.deployLog = "";
+                                        response.data.forEach(function(item) {
+                                            $this.deployLog += item.memo + "\r\n";
+                                        });
+                                    });
+                            }, 1000);
+                            var taskId = response.data.id;
+                            $this.active = 0;
+                            $this.deployLog = "";
+
+                            $.post("/task/deploy", {
+                                taskId: response.data.id
+                            }).success(function(response) {
+                                clearInterval(timer);
+
+                                if (response.code == 200) {
+                                    $.get("/api/task-process/" + taskId)
+                                        .success(function(response) {
+                                            $this.active = response.data.length;
+                                            $this.deployLog = "";
+                                            response.data.forEach(function(item) {
+                                                $this.deployLog += item.memo + "\r\n";
+                                            });
+                                        });
+                                } else {
+                                    $this.deployLog = response.message;
+                                }
+
+
+                            });
+
+                            $this.deployDialogVisible = true;
+
+                        }).catch(() => {
+                            $this.$message({
+                                type: 'info',
+                                message: '取消上线'
+                            });
+                        });
+                    }
+
+                });
+            },
+            rollbacktask: function(task) {
+
+            },
+            deleteTask: function(task) {
+                var $this = this;
+                this.$confirm('你确定要删除这个项目吗？', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    $.ajax({
+                        'url': "/api/tasks/" + task.id,
+                        'method': "DELETE",
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '删除成功!'
+                            });
+                            $this.search();
+                        }
+
+                        if (response.code == 500) {
+                            $this.$message.error({
+                                message: response.data
+                            });
+                        }
+
+                    });
+                }).catch(() => {
+                    $this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    });
+                });
+            },
+            showProccess: function(task) {
+                var $this = this;
+                var timer = setInterval(function() {
+                    $.get("/api/task-process/" + task.id)
+                        .success(function(response) {
+                            $this.active = response.data.length;
+                            $this.deployLog = "";
+                            response.data.forEach(function(item) {
+                                $this.deployLog += item.memo + "\r\n";
+                            });
+                            if ($this.active == 8) {
+                                clearInterval(timer);
+                            }
+                        });
+                }, 1000);
+                $this.deployDialogVisible = true;
+            },
+            applyInit: function(task) {
+                var $this = this;
+                this.selectedTask = task;
+                $.get('/api/users/admins').success(function(response) {
+                    $this.applyDialogVisible = true;
+                    $this.admins = response.data;
+                });
+            },
+            apply: function() {
+                var $this = this;
+                $this.auditModel.task_id = $this.selectedTask.id;
+                $.ajax({
+                    url: '/api/tasks/audits',
+                    type: 'POST',
+                    data: JSON.stringify($this.auditModel),
+                    contentType: "application/json;charset=utf-8",
+                    success: function(response) {
+                        $this.$message('申请成功，稍安勿躁');
+                        $this.applyDialogVisible = false;
+                        $this.search();
+                    }
+                });
+            },
+            showAuditCondition: function(task) {
+                var taskAuditsOk = false;
+                if (task.taskAudits) {
+                    for (var key in task.taskAudits) {
+                        var taskAudit = task.taskAudits[key];
+                        if (taskAudit.flag != '1') {
+                            taskAuditsOk = true;
+                            break;
+                        }
+                    }
+                }
+                return (task.status == 0 && !taskAuditsOk) || (task.status == 2 && !taskAuditsOk);
+            }
+        }
+    });
+
+
+    $(function() {
+        $.get("/api/current-user ", function(response) {
+            app.currentUser = response.data;
+        });
+        app.search();
+    });
+</script>
+<!-- /.page-content -->
+{% endblock %}

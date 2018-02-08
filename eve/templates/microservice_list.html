@@ -1,0 +1,154 @@
+{% extends "layout.html" %} {% block title %} 上线单列表 {% endblock %} {% set active='task_list' %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="fa fa-home home-icon"></i>
+            <a href="/">
+                    首页 </a>
+        </li>
+        <li class="active">微服务查询</li>
+    </ul>
+    <!-- .breadcrumb -->
+</div>
+
+{% endblock %} {% block body %} {% raw %}
+<input hidden value="6" id="activeMenu" />
+
+<div class="page-content" id="app" v-cloak>
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <div class="col-xs-12 col-sm-8" style="padding-left: 0;margin-bottom: 10px;margin-top:10px;">
+                        <!-- <div>
+                            <el-input placeholder="任务名称" v-model="kw">
+                                <el-button slot="append" icon="search" @click="search" v-loading.fullscreen.lock="fullscreenLoading"></el-button>
+                            </el-input>
+                        </div> -->
+
+                        <el-form :inline="true" class="demo-form-inline">
+                            <el-form-item label="标签">
+                                <el-select v-model="label" placeholder="选择标签" size="small" @change="labelChange()" :filterable="true">
+                                    <el-option key="1" label="TEST" value="1"> </el-option>
+                                    <el-option key="2" label="PROD" value="2"> </el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="服务名称">
+                                <el-select v-model="appName" placeholder="选择状态" size="small" @change="change()" :filterable="true">
+                                    <el-option v-for="app_name in app_names" :key="app_name" :label="app_name" :value="app_name">
+                                    </el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="gray" @click="search()" size="small">
+                                    <i class="fa fa-refresh"></i> 刷新
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+
+                    </div>
+
+                </div>
+                <!-- /.box-header -->
+                <div class="box-body table-responsive no-padding clearfix">
+
+                    <el-table :data="instances" border style="width: 100%" size="small">
+                        <el-table-column prop="instanceId" label="ID" width="400">
+                        </el-table-column>
+                        <el-table-column prop="appGroupName" label="组名" width="100">
+                            <template scope="scope">
+                                    <el-tag type="primary">{{scope.row.appGroupName}}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="IP">
+                            <template scope="scope">
+                                        {{scope.row.ipAddr}}:{{scope.row.port}}
+                                </template>
+                        </el-table-column>
+                        <el-table-column prop="status" label="当前状态" width="200">
+                            <template scope="scope">
+                                    <el-tag v-if="scope.row.status=='UP'" type="success">运行中</el-tag>
+                                    <el-tag v-if="scope.row.status!='UP'" type="danger">出现了点儿小状况</el-tag>
+                            </template>
+                        </el-table-column>
+
+                    </el-table>
+                </div>
+                <!-- /.box-body -->
+
+
+            </div>
+
+
+        </div>
+        <!-- /.col -->
+    </div>
+    <!-- /.row -->
+</div>
+{% endraw %}
+
+<script type="text/javascript ">
+    //状态0：新建提交，1审核通过，2审核拒绝，3上线完成，4上线失败',
+    var app = new Vue({
+        el: '#app',
+        data: {
+            instances: [],
+            kw: "",
+            fullscreenLoading: false,
+            status: 1,
+            projectDeploy: {},
+            deployProjects: [],
+            deployBranchs: [],
+            deployDialogVisible: false,
+            applyDialogVisible: false,
+            appName: "",
+            app_names: [],
+            applications: {},
+            label: "1"
+        },
+        methods: {
+            search: function() {
+                var $this = this;
+                this.fullscreenLoading = true;
+                $.ajax({
+                    url: '/api/micro-services',
+                    type: 'GET',
+                    success: function(res) {
+                        app.app_names = res.app_names;
+                        app.applications = res.applications;
+                        app.instances = app.applications[0].instances;
+                        this.fullscreenLoading = false;
+                    }
+                });
+            },
+            change: function() {
+                app.instances = app.applications.filter(function(item) {
+                    return item.name == app.appName
+                })[0].instances;
+
+            },
+            showLog: function() {
+
+            },
+            labelChange: function() {
+                $.ajax({
+                    url: '/api/micro-services',
+                    type: 'GET',
+                    data: {
+                        label: app.label
+                    },
+                    success: function(res) {
+                        app.app_names = res.app_names;
+                        app.applications = res.applications;
+                        app.instances = app.applications[0].instances;
+                        this.fullscreenLoading = false;
+                    }
+                });
+            }
+        }
+    });
+
+    app.search();
+</script>
+<!-- /.page-content -->
+{% endblock %}

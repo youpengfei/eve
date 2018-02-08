@@ -1,0 +1,251 @@
+{% extends "layout.html" %} {% block title %} 上线单列表 {% endblock %} {% set active='task_audit' %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="fa fa-home home-icon"></i>
+            <a href="/">
+                    首页 </a>
+        </li>
+        <li class="active">审核上线单</li>
+    </ul>
+    <!-- .breadcrumb -->
+</div>
+
+{% endblock %} {% block body %} {% raw %}
+<input hidden value="4" id="activeMenu" />
+
+<div class="page-content" id="app" v-cloak>
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <el-form :inline="true" class="demo-form-inline">
+                        <el-form-item label="任务名称">
+                            <el-input v-model="kw" placeholder="任务名称" size="small"></el-input>
+                        </el-form-item>
+                        <el-form-item label="上线状态">
+                            <el-select v-model="status" placeholder="选择状态" size="small">
+                                <el-option v-for="status in allStatus" :key="status.value" :label="status.label" :value="status.value">
+                                </el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="gray" @click="search()" icon="search" size="small">
+                                查询
+                            </el-button>
+                        </el-form-item>
+                    </el-form>
+                </div>
+                <!-- /.box-header -->
+                <div class="box-body table-responsive no-padding clearfix">
+
+                    <el-table :data="audits" border style="width: 100%" size="small">
+                        <el-table-column prop="task.user.realname" label="开发者" width="120">
+                        </el-table-column>
+                        <el-table-column prop="task.project.name" label="对应项目" width="200">
+                        </el-table-column>
+                        <el-table-column prop="task.title" label="上线标题" width="200">
+                        </el-table-column>
+                        <el-table-column prop="task.created_at" label="上线时间" width="200">
+                            <template scope="scope">
+                                {{scope.row.created_at | datetime }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="task.branch" label="对应分支" width="100">
+                        </el-table-column>
+
+                        <el-table-column label="当前状态" width="120">
+                            <template scope="scope">
+                                <span v-for='item in allStatus' :key="item.value">
+                                    <span v-if="item.value==scope.row.task.status"  >
+                                            {{item.label}}
+                                    </span>
+                                </span>
+
+                            </template>
+                        </el-table-column>
+
+                        <el-table-column prop="deploy_reason" label="上线理由" width="200">
+                        </el-table-column>
+
+                        <el-table-column prop="reject_reason" label="拒绝理由" width="200">
+                        </el-table-column>
+
+                        <el-table-column fixed="right" label="操作">
+                            <template scope="scope">
+                                <div  v-if="scope.row.task.status==0 || scope.row.flag=='0'">
+                                      <el-button type="primary" size="small"  @click="pass(scope.row)"> 审核通过</el-button>
+                                      <el-button type="warning" size="small"  @click="reject(scope.row)">审核拒绝</el-button>
+                                </div>
+                                <el-button type="danger" size="small"   icon="delete" v-if="scope.row.task.status==0" @click="removeAudit(scope.row)" >删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <el-dialog title="填写拒绝理由" :visible.sync="dialogFormVisible">
+                        <el-form>
+                            <el-form-item label="拒绝理由" :label-width="formLabelWidth">
+                                <el-input v-model="rejectReason" auto-complete="off" type="textarea" :row="2"></el-input>
+                            </el-form-item>
+                        </el-form>
+                        <div slot="footer" class="dialog-footer">
+                            <el-button @click="dialogFormVisible = false">取 消</el-button>
+                            <el-button type="primary" @click="sureReject()">确 定</el-button>
+                        </div>
+                    </el-dialog>
+
+
+                    <div class="block">
+                        <el-pagination style="margin-top:30px;" @current-change="handleCurrentChange" :current-page.sync="currentPage" :page-size="10" layout="total,prev, pager, next, jumper" :total="total">
+                        </el-pagination>
+                    </div>
+                </div>
+                <!-- /.box-body -->
+
+
+            </div>
+
+
+        </div>
+        <!-- /.col -->
+    </div>
+    <!-- /.row -->
+</div>
+
+
+<script type="text/javascript">
+    Vue.filter('datetime', function(value) {
+        return moment(value).format('YYYY-MM-DD HH:mm:ss')
+    });
+    var app = new Vue({
+        el: "#app",
+        data: {
+            audits: [],
+            currentPage: 1,
+            total: 0,
+            kw: "",
+            status: 0,
+            allStatus: [{
+                value: 0,
+                label: "新建提交 "
+            }, {
+                value: 1,
+                label: "审核通过 "
+            }, {
+                value: 2,
+                label: "审核拒绝 "
+            }, {
+                value: 3,
+                label: "上线完成 "
+            }, {
+                value: 4,
+                label: "上线失败 ",
+            }, {
+                value: 5,
+                label: "上线中 ",
+            }],
+            dialogFormVisible: false,
+            rejectReason: "",
+            formLabelWidth: '120px',
+            selectedAudit: {}
+        },
+        methods: {
+            handleCurrentChange: function() {
+
+            },
+            search: function() {
+                $.get("/api/tasks/audits", {
+                        title: this.kw,
+                        status: this.status
+                    })
+                    .success(function(response) {
+                        if (response.code == 200) {
+                            app.audits = response.data;
+                            app.total = response.total_count;
+                        }
+                    });
+
+            },
+            removeAudit: function(object) {
+                var $this = this;
+                this.$confirm('确定删除这个上线申请吗？', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    $.ajax({
+                        'url': "/api/tasks/audits/" + object.id,
+                        'method': "DELETE",
+                    }).success(function(response) {
+                        if (response.code == 200) {
+                            $this.$message({
+                                type: 'success',
+                                message: '删除成功!'
+                            });
+                            $this.search();
+                        }
+
+                        if (response.code == 500) {
+                            $this.$message.error({
+                                message: response.data
+                            });
+                        }
+
+                    });
+                }).catch(() => {
+                    $this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    });
+                });
+            },
+            pass: function(object) {
+                var $this = this;
+                $.ajax({
+                    'url': "/api/tasks/" + object.task.id + "/audits/" + object.id,
+                    'data': {
+                        status: 1
+                    },
+                    method: 'PUT'
+                }).success(function(response) {
+                    object.flag = 1;
+                    $this.$message({
+                        type: 'info',
+                        message: '审核通过'
+                    });
+                    $this.search();
+                });
+
+            },
+            reject: function(object) {
+                this.dialogFormVisible = true;
+                this.selectedAudit = object;
+            },
+            sureReject: function() {
+                var $this = this;
+                var object = $this.selectedAudit;
+                $.ajax({
+                    'url': "/api/tasks/" + object.task.id + "/audits/" + object.id,
+                    'data': {
+                        status: 2,
+                        reject_reason: $this.rejectReason
+                    },
+                    method: 'PUT'
+                }).success(function(response) {
+                    object.flag = 1;
+                    $this.$message({
+                        type: 'info',
+                        message: '审核拒绝'
+                    });
+                    this.dialogFormVisible = false;
+                });
+            }
+        }
+    });
+    $(function() {
+        app.search();
+    })
+</script>
+{% endraw %}
+<!-- /.page-content -->
+{% endblock %}

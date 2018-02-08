@@ -1,0 +1,144 @@
+{% extends "layout.html" %} {% set active='ecs_list' %} {% block title %} 服务器列表 {% endblock %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="icon-home home-icon"></i>
+            <a href="#">
+                首页 </a>
+        </li>
+        <li class="active">服务器列表</li>
+    </ul>
+</div>
+
+{% endblock %} {% block body %}
+<input hidden value="8" id="activeMenu" />
+<div class="page-content">
+    <div class="row">
+        <div class="col-xs-12">
+            {% raw %}
+            <div class="box" id="app">
+                <!-- /.box-header -->
+
+                <div class="box-body   clearfix">
+                    <el-table  :data="ecslist" border style="width: 100%">
+                        <el-table-column prop="InstanceId" label="实例ID" min-width="25%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'">{{ scope.row.InstanceId }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="InstanceName" label="实例名称" min-width="25%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'">{{ scope.row.InstanceName }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="privateip" label="私有IP" min-width="25%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'" v-if="scope.row.VpcAttributes.PrivateIpAddress.IpAddress!=''">{{ scope.row.VpcAttributes.PrivateIpAddress.IpAddress }}</el-tag>
+                                <el-tag :type="'gray'" v-if="scope.row.VpcAttributes.PrivateIpAddress.IpAddress==''">{{ scope.row.InnerIpAddress.IpAddress }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="publicip" label="公网IP" min-width="25%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'" v-if="scope.row.EipAddress.IpAddress!=''">{{ scope.row.EipAddress.IpAddress }}</el-tag>
+                                <el-tag :type="'gray'" v-if="scope.row.EipAddress.IpAddress==''">{{ scope.row.PublicIpAddress.IpAddress }}</el-tag>
+                            </template>
+                        </el-table-column>
+                         <el-table-column prop="Status" label="状态" min-width="15%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'">{{ scope.row.Status }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="InstanceNetworkType" label="网络类型" min-width="15%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'">{{ scope.row.InstanceNetworkType }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="监控" width="100">
+                            <template scope="scope">
+                                <!--<el-button size="small" type="primary" icon="view" @click="moreEcsInfo()">监控</el-button>-->
+                                <!--<a @click="moreEcsInfo(scope.row)" v-loading.fullscreen.lock="fullscreenLoading"><i class="el-icon-view"></i></a>-->
+                                <a @click="moreEcsInfo(scope.row)"><i class="el-icon-view"></i></a>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <el-dialog title="ECS使用详情" :visible.sync="dialogTableVisible">
+                            <el-tabs>
+                                <el-tab-pane label="MEM">
+                                    <pre>{{ ecsmem }}</pre>
+                                </el-tab-pane>
+                                <el-tab-pane label="DISK">
+                                    <pre>{{ ecsdisk }}</pre>
+                                </el-tab-pane>
+                            </el-tabs>
+                    </el-dialog>
+
+                </div>
+            </div>
+            <!-- /.box-body -->
+        </div>
+
+        {% endraw %}
+        <script>
+            <!-- 初始化vue函数 -->
+            var app = new Vue({
+                el: '#app',
+                data: {
+                    ecslist:[],
+                    fullscreenLoading: false,
+                    dialogTableVisible: false,
+                    ecsmem:'',
+                    ecsdisk:''
+                },
+                methods: {
+                    search: function(obj) {
+                        var $this = this;
+                        $this.fullscreenLoading = true;
+                        $.ajax({
+                            url: '/api/ecs',
+                            type: 'GET',
+                            success: function(res) {
+                                app.ecslist = res.data;
+                                $this.fullscreenLoading = false;
+                            }
+                        });
+                    },
+                    moreEcsInfo: function(obj) {
+                        var $this = this;
+                        $this.dialogTableVisible = true;
+                        var ip ="";
+                        var vpcip = obj.VpcAttributes.PrivateIpAddress.IpAddress;
+                        var pub_innerip = obj.PublicIpAddress.IpAddress;
+                        (vpcip == '') ? ip=pub_innerip : ip=vpcip;
+                        $.ajax({
+                            url: '/api/ecs/detail/'+ip,
+                            type: 'GET',
+                            success: function(response) {
+                                $this.ecsmem = response.mem
+                                $this.ecsdisk = response.disk
+                            }
+                        });
+                    }
+                }
+            });
+
+            <!-- 初始化表单列表 -->
+            app.search();
+
+            jQuery(function($) {
+                $('[data-rel=tooltip]').tooltip({
+                    container: 'body'
+                });
+                $('[data-rel=popover]').popover({
+                    container: 'body'
+                });
+            });
+
+        </script>
+    </div>
+    <!-- /.col -->
+</div>
+<!-- /.row -->
+</div>
+
+{% endblock %}

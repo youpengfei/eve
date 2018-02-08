@@ -1,0 +1,235 @@
+{% extends "layout.html" %} {% set active='monitor_supervisord_list' %} {% block title %} 应用服务管理 {% endblock %} {% block bodyHead %}
+<div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+        <li>
+            <i class="icon-home home-icon"></i>
+            <a href="#">
+                首页 </a>
+        </li>
+        <li class="active">应用服务管理</li>
+    </ul>
+</div>
+
+{% endblock %} {% block body %}
+<input hidden value="5" id="activeMenu" />
+
+<div class="page-content">
+    <div class="row">
+        <div class="col-xs-12">
+            {% raw %}
+            <div class="box" id="app">
+                <div class="box-header">
+                    <div class="col-xs-12 col-sm-8" style="margin-bottom: 10px;">
+                        <div>
+                             <el-select v-model="SelectServer" placeholder="切换监控主机" @change="choseServer">
+                                <el-option-group  v-for="group in options3" :key="group.label" :label="group.label" >
+                                  <el-option v-for="item in group.options" :key="item.value" :label="item.label" :value="item.value"></el-option>
+                                </el-option-group>
+                             </el-select>
+                        </div>
+                    </div>
+                </div>
+                <!-- /.box-header -->
+
+                <div class="box-body   clearfix">
+                    <el-table :data="monitorlist" border style="width: 100%">
+                        <el-table-column prop="name" label="应用名称" min-width="15%">
+                            <template scope="scope">
+                                <el-tag>{{ scope.row.name }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="description" label="时间描述" min-width="20%">
+                            <template scope="scope">
+                                <el-tag :type="'gray'">{{ scope.row.description }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="statename" label="状态" min-width="10%">
+                            <template scope="scope">
+                                <el-tag v-if="scope.row.state=='0'" :type="'gray'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='10'" :type="'primary'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='20'" :type="'success'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='30'" :type="'warning'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='40'" :type="'primary'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='100'" :type="'warning'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='200'" :type="'danger'">{{ scope.row.statename }}</el-tag>
+                                <el-tag v-if="scope.row.state=='1000'" :type="'gray'">{{ scope.row.statename }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="操作" min-width="20%">
+                            <template scope="scope">
+                                <el-button size="small" type="info" :loading="scope.row.startLoading" @click="startService(scope.row)" :disabled="scope.row.state=='20'">启动</el-button>
+                                <el-button size="small" type="danger" :loading="scope.row.stopLoading" @click="stopService(scope.row)" :disabled="scope.row.state!='20'">停止</el-button>
+                                <el-button size="small" type="warning" :loading="scope.row.restartLoading" @click="restartService(scope.row)" :disabled="scope.row.state!='20'">重启</el-button>
+                                <el-button type="text" @click="showLogDialog(scope.row)">查看日志</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <el-dialog title="日志查看" :visible.sync="diaLogVisible">
+                         <pre>{{ showLog }}</pre>
+                    </el-dialog>
+
+                </div>
+            </div>
+            <!-- /.box-body -->
+        </div>
+
+        {% endraw %}
+        <script>
+            <!-- 初始化vue函数 -->
+            var app = new Vue({
+                el: '#app',
+                data: {
+                    monitorlist: [],
+                    kw: "",
+                    SelectServer:'',
+                    options3:'',
+                    diaLogVisible: false,
+                    rDialogVisible: false,
+                    selectedUser: {},
+                    showLog:{},
+                    fullscreenLoading: false,
+                    addUserDialogVisible: false,
+                    startLoading :false,
+                    stopLoading :false,
+                    restartLoading:false,
+                    dialogLogVisible:false,
+                    form: {
+
+                    },
+                    currentPage: 1,
+                    total: 0
+                },
+                methods: {
+                    search: function(obj) {
+                        var $this = this;
+                        $this.fullscreenLoading = true;
+                        $.ajax({
+                            url: '/api/monitor',
+                            type: 'GET',
+                            success: function(res) {
+                                //遍历元素赋值button的loading状态
+                                res.data.forEach(function(item) {
+                                 item.startLoading=false;
+                                 item.stopLoading=false;
+                                 item.restartLoading=false;
+                                 app.monitorlist.push(item);
+                             });
+                                app.options3=res.servers.options3;
+                                app.SelectServer=res.initSelect;
+                                app.monitorlist = res.data;
+                                $this.fullscreenLoading = false;
+                            }
+                        });
+                    },
+                    startService: function(obj) {
+                        var $this = this;
+                        obj.startLoading =true;
+                        $.ajax({
+                            url: '/api/monitor/servername/' + obj.name + '/operation/start/ip/'+app.SelectServer,
+                            type: 'GET',
+                            success: function(response) {
+                                if(response.data){
+                                    $this.$message(obj.name+':启动成功');
+                                    app.choseServer();
+                                    obj.startLoading = false;
+                                }else{
+                                    $this.$message(obj.name+':启动失败');
+                                    obj.startLoading = false;
+                                }
+                            }
+                        });
+                    },
+
+                    stopService: function(obj) {
+                        var $this = this;
+                        obj.stopLoading = true;
+                        $.ajax({
+                            url: '/api/monitor/servername/' + obj.name + '/operation/stop/ip/'+app.SelectServer,
+                            type: 'GET',
+                            success: function(response) {
+                                if(response.data){
+                                    $this.$message(obj.name+':停止成功');
+                                    app.choseServer();
+                                    obj.stopLoading = false;
+                                }else{
+                                    $this.$message(obj.name+':停止失败');
+                                    obj.stopLoading = false;
+                                }
+                            }
+                        });
+                    },
+
+                    restartService:function(obj) {
+                        var $this = this;
+                        obj.restartLoading = true;
+                        $.ajax({
+                            url: '/api/monitor/servername/' + obj.name + '/operation/restart/ip/'+app.SelectServer,
+                            type: 'GET',
+                            success: function(response) {
+                                if(response.data){
+                                    $this.$message(obj.name+':重启成功');
+                                    app.choseServer();
+                                    obj.restartLoading = false;
+                                }else{
+                                    $this.$message(obj.name+':重启失败');
+                                    obj.restartLoading = false;
+                                }
+                            }
+                        });
+                    },
+
+                    showLogDialog: function(obj) {
+                        var $this = this;
+                        $this.diaLogVisible=true;
+                        $.ajax({
+                            url: '/api/monitor/serverlog/servername/' + obj.name + '/ip/'+app.SelectServer,
+                            type: 'GET',
+                            success: function(response) {
+                               $this.showLog =response.data;
+                            }
+                        });
+                    },
+                    choseServer: function() {
+                        var $this = this;
+                        $this.fullscreenLoading = true;
+                        $.ajax({
+                            url: '/api/monitor/ip/'+app.SelectServer,
+                            type: 'GET',
+                            success: function(res) {
+                                //遍历元素赋值button的loading状态
+                                 res.data.forEach(function(item) {
+                                 item.startLoading=false;
+                                 item.stopLoading=false;
+                                 item.restartLoading=false;
+                                 app.monitorlist.push(item);
+                             });
+                                app.options3=res.servers.options3;
+                                app.monitorlist = res.data;
+                                $this.fullscreenLoading = false;
+                            }
+                        });
+                    }
+                }
+            });
+
+            <!-- 初始化表单列表 -->
+            app.search();
+
+            jQuery(function($) {
+                $('[data-rel=tooltip]').tooltip({
+                    container: 'body'
+                });
+                $('[data-rel=popover]').popover({
+                    container: 'body'
+                });
+            });
+
+        </script>
+    </div>
+    <!-- /.col -->
+</div>
+<!-- /.row -->
+</div>
+
+{% endblock %}
