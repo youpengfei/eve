@@ -22,7 +22,7 @@ MarkupSafe==0.23
 marshmallow==2.13.5
 marshmallow-sqlalchemy==0.13.1
 oss2==2.3.3
-paramiko==1.15.2
+paramiko ~> 1.17.6
 pep8==1.7.0
 plumbum==1.5.0
 pycparser==2.17
